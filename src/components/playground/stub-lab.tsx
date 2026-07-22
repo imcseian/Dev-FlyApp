@@ -7,16 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, MousePointerClick, Send, Webhook } from "lucide-react";
 
 /**
- * Playwright concept: `cy.stub()` + `cy.spy()`.
+ * Playwright concept: `page.exposeFunction()` + `page.evaluate()` for stubbing.
  *
  * This module exposes a global `window.CyRam` object with several methods.
- * Playwright tests can stub or spy on any of them:
+ * Playwright tests can stub or spy on any of them via exposeFunction:
  *
- *   cy.window().then((win) => {
- *     cy.stub(win.CyRam, 'trackEvent').as('trackEvent')
- *   })
- *   cy.get('[data-testid=stub-track-click]').click()
- *   cy.get('@trackEvent').should('have.been.calledWith', 'button_click', { id: 'track-click' })
+ *   const calls: any[] = [];
+ *   await page.exposeFunction('trackEventSpy', (...args) => calls.push(args));
+ *   await page.evaluate(() => { window.CyRam.trackEvent = window.trackEventSpy; });
+ *   await page.getByTestId('stub-track-click').click();
+ *   expect(calls).toEqual([['button_click', { id: 'track-click' }]]);
  *
  * The component renders a live log of method calls so you can verify visually
  * too.
@@ -111,7 +111,7 @@ export function StubLab() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Exposes <code className="px-1 py-0.5 bg-muted rounded">window.CyRam</code>{" "}
-          with four methods. Stub them in your test, click the buttons below,
+          with four methods. Stub them via <code className="px-1 py-0.5 bg-muted rounded">page.exposeFunction()</code>, click the buttons below,
           then assert the stub was called with the expected args.
         </p>
 
@@ -119,12 +119,15 @@ export function StubLab() {
           className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono"
           data-testid="stub-snippet"
         >
-{`cy.window().then((win) => {
-  cy.stub(win.CyRam, 'trackEvent').as('track')
-})
-cy.get('[data-testid=stub-track-click]').click()
-cy.get('@track').should('have.been.calledWith',
-  'button_click', { id: 'track-click' })`}
+{`const calls: any[] = [];
+await page.exposeFunction('trackEventSpy', (...args) => calls.push(args));
+await page.evaluate(() => {
+  window.CyRam.trackEvent = window.trackEventSpy;
+});
+await page.getByTestId('stub-track-click').click();
+expect(calls).toEqual([
+  ['button_click', { id: 'track-click' }],
+]);`}
         </pre>
 
         {/* Action buttons */}

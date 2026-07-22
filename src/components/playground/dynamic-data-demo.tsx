@@ -18,7 +18,7 @@ interface StockEntry {
 /**
  * Playground module: Dynamic data.
  *
- * Polls /api/stock every 2 seconds and renders live stock counts. playwright
+ * Polls /api/seats every 2 seconds and renders live seat counts. playwright
  * tests can assert that values change over time (e.g. `await expect(locator)
  * .not.toHaveText(initial)`).
  */
@@ -35,10 +35,10 @@ export function DynamicDataDemo() {
 
     const tick = async () => {
       try {
-        const res = await fetch("/api/stock?delay=300");
+        const res = await fetch("/api/seats?delay=300");
         const data = await res.json();
         if (cancelled) return;
-        setStock(data.stock as StockEntry[]);
+        setStock(data.seats as StockEntry[]);
         setLastUpdated(data.serverTime as number);
         setUpdateCount((c) => c + 1);
         setLoading(false);
@@ -113,7 +113,7 @@ export function DynamicDataDemo() {
             className="text-sm text-muted-foreground py-4"
             data-testid="dynamic-data-loading"
           >
-            Loading stock data...
+            Loading seat data...
           </div>
         ) : (
           <ul

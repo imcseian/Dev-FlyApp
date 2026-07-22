@@ -14,11 +14,17 @@ import { Boxes, Layers } from "lucide-react";
  * Playwright test patterns:
  *
  *   // Open shadow root — straightforward
- *   cy.get('cy-ram-counter').shadow().find('[data-testid=increment]').click()
- *   cy.get('cy-ram-counter').shadow().find('[data-testid=count]').should('contain', '1')
+ *   await page.locator('cy-ram-counter')
+ *     .shadow()
+ *     .getByTestId('shadow-increment')
+ *     .click();
+ *   await expect(page.locator('cy-ram-counter')
+ *     .shadow()
+ *     .getByTestId('shadow-count'))
+ *     .toHaveText('1');
  *
- *   // Closed shadow root — must use { includeShadowDom: true } on selectBy*
- *   // or attach Playwright's closed-shadow-dom plugin.
+ *   // Closed shadow root — Playwright pierces shadow DOM by default.
+ *   await page.getByTestId('shadow-toggle-btn').click();
  */
 
 // --- Web Component definitions (registered only on the client) ---
@@ -148,21 +154,19 @@ export function ShadowDomLab() {
           className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono"
           data-testid="shadow-snippet"
         >
-{`// Open shadow root
-cy.get('cy-ram-counter')
+{`// Open shadow root — use .shadow() locator
+await page.locator('cy-ram-counter')
   .shadow()
-  .find('[data-testid=shadow-increment]')
-  .click()
-cy.get('cy-ram-counter')
+  .getByTestId('shadow-increment')
+  .click();
+await expect(page.locator('cy-ram-counter')
   .shadow()
-  .find('[data-testid=shadow-count]')
-  .should('contain', '1')
+  .getByTestId('shadow-count'))
+  .toHaveText('1');
 
-// Closed shadow root — includeShadowDom
-cy.get('cy-ram-toggle')
-  .shadow({ includeShadowDom: true })
-  .find('[data-testid=shadow-toggle-btn]')
-  .click()`}
+// Closed shadow root — Playwright pierces
+// shadow DOM by default with css/data-testid
+await page.getByTestId('shadow-toggle-btn').click();`}
         </pre>
 
         {mounted ? (

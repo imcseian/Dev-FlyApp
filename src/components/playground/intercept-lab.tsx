@@ -29,15 +29,18 @@ interface StatsResponse {
 type ResponseKind = "users" | "posts" | "stats" | "error" | null;
 
 /**
- * Playwright concept: `cy.intercept()` + `cy.wait('@alias')`.
+ * Playwright concept: `page.route()` + `page.waitForResponse()`.
  *
  * Three buttons fire predictable network requests with stable response shapes.
- * Playwright can stub these:
+ * Playwright can stub or wait for them:
  *
- *   cy.intercept('GET', '/api/pw/users', { fixture: 'users.json' }).as('getUsers')
- *   cy.get('[data-testid=intercept-fetch-users]').click()
- *   cy.wait('@getUsers').its('response.statusCode').should('eq', 200)
- *   cy.get('[data-testid=intercept-user-row]').should('have.length', 3)
+ *   await page.route('/api/pw/users', route => route.fulfill({ path: 'fixtures/users.json' }))
+ *   const [res] = await Promise.all([
+ *     page.waitForResponse(resp => resp.url().includes('/api/pw/users')),
+ *     page.getByTestId('intercept-fetch-users').click(),
+ *   ])
+ *   expect(res.status()).toBe(200)
+ *   await expect(page.getByTestId('intercept-user-row')).toHaveCount(3)
  */
 export function InterceptLab() {
   const [loading, setLoading] = useState<ResponseKind>(null);
@@ -118,8 +121,8 @@ export function InterceptLab() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Each button fires a network request with a predictable response shape.
-          Use <code className="px-1 py-0.5 bg-muted rounded">cy.intercept()</code>{" "}
-          to stub these and <code className="px-1 py-0.5 bg-muted rounded">cy.wait(&apos;@alias&apos;)</code>{" "}
+          Use <code className="px-1 py-0.5 bg-muted rounded">page.route()</code>{" "}
+          to stub these and <code className="px-1 py-0.5 bg-muted rounded">page.waitForResponse()</code>{" "}
           to assert on them.
         </p>
 
@@ -128,10 +131,18 @@ export function InterceptLab() {
           className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono"
           data-testid="intercept-snippet"
         >
-{`cy.intercept('GET', '/api/pw/users*').as('getUsers')
-cy.get('[data-testid=intercept-fetch-users]').click()
-cy.wait('@getUsers')
-cy.get('[data-testid=intercept-user-row]').should('have.length', 3)`}
+{`// Stub the response with a fixture
+await page.route('**/api/pw/users**', async route => {
+  await route.fulfill({ path: 'fixtures/users.json' });
+});
+
+// Or wait for the real response
+const [response] = await Promise.all([
+  page.waitForResponse('**/api/pw/users**'),
+  page.getByTestId('intercept-fetch-users').click(),
+]);
+expect(response.status()).toBe(200);
+await expect(page.getByTestId('intercept-user-row')).toHaveCount(3);`}
         </pre>
 
         {/* Action buttons */}

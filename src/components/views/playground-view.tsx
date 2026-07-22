@@ -13,12 +13,18 @@ import { StubLab } from "@/components/playground/stub-lab";
 import { ShadowDomLab } from "@/components/playground/shadow-dom-lab";
 import { SessionLab } from "@/components/playground/session-lab";
 import { ConditionalLab } from "@/components/playground/conditional-lab";
+import { NewTabDemo } from "@/components/playground/newtab-demo";
+import { DownloadDemo } from "@/components/playground/download-demo";
+import { DialogDemo } from "@/components/playground/dialog-demo";
+import { DragDropDemo } from "@/components/playground/dragdrop-demo";
+import { HoverDemo } from "@/components/playground/hover-demo";
+import { GeoDemo } from "@/components/playground/geo-demo";
 import { FlaskConical } from "lucide-react";
 
 /**
  * Playground view — composes every edge-case module into one scrollable page.
- * Each module is a Card with a stable data-testid attribute so Playwright tests can
- * scope their assertions.
+ * Each module is a Card with a stable data-testid attribute so Playwright tests
+ * can scope their assertions.
  */
 export function PlaygroundView() {
   return (
@@ -35,7 +41,8 @@ export function PlaygroundView() {
           A curated collection of intentional edge cases for the Playwright
           Mastery Academy. Every module below is a deliberate test target —
           network intercepts, time control, stubs & spies, shadow DOM,
-          sessions, conditional testing, plus the classic auto-waiting,
+          sessions, conditional testing, new tabs, downloads, dialogs,
+          drag & drop, hover, geolocation, plus classic auto-waiting,
           iframes, file uploads, dynamic data, visual regressions,
           accessibility violations, and XSS.
         </p>
@@ -49,6 +56,16 @@ export function PlaygroundView() {
         <ShadowDomLab />
         <SessionLab />
         <ConditionalLab />
+      </div>
+
+      {/* Browser interaction modules */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <NewTabDemo />
+        <DownloadDemo />
+        <DialogDemo />
+        <DragDropDemo />
+        <HoverDemo />
+        <GeoDemo />
       </div>
 
       {/* Classic modules */}

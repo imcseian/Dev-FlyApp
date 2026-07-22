@@ -7,16 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, Gift, Pause, Play, RotateCcw, Timer } from "lucide-react";
 
 /**
- * Playwright concept: `cy.clock()` + `cy.tick()`.
+ * Playwright concept: `page.clock()` for time control.
  *
  * All timers here use real `setTimeout` / `setInterval` so Playwright can freeze
- * and advance them with `cy.clock()` and `cy.tick(ms)`.
+ * and advance them with `page.clock().install()` and `page.clock().tick(ms)`.
  *
- *   cy.clock()
- *   cy.visit('/')
- *   cy.get('[data-testid=clock-start-countdown]').click()
- *   cy.tick(10_000)                              // advance 10 seconds
- *   cy.get('[data-testid=clock-countdown]').should('contain', 'Countdown complete')
+ *   await page.clock().install();
+ *   await page.goto('/');
+ *   await page.getByTestId('clock-start-countdown').click();
+ *   await page.clock().tick(10_000);  // advance 10 seconds
+ *   await expect(page.getByTestId('clock-countdown')).toContainText('Countdown complete');
  */
 export function ClockLab() {
   // Live clock — updates every second.
@@ -127,8 +127,8 @@ export function ClockLab() {
         <p className="text-sm text-muted-foreground">
           All timers here use real <code className="px-1 py-0.5 bg-muted rounded">setTimeout</code>
           /<code className="px-1 py-0.5 bg-muted rounded">setInterval</code> — control
-          them with <code className="px-1 py-0.5 bg-muted rounded">cy.clock()</code> and
-          advance time with <code className="px-1 py-0.5 bg-muted rounded">cy.tick(ms)</code>.
+          them with <code className="px-1 py-0.5 bg-muted rounded">page.clock().install()</code> and
+          advance time with <code className="px-1 py-0.5 bg-muted rounded">page.clock().tick(ms)</code>.
         </p>
 
         {/* Live clock */}
@@ -182,7 +182,7 @@ export function ClockLab() {
             <div>
               <p className="font-medium">10-second countdown</p>
               <p className="text-xs text-muted-foreground">
-                Use <code>cy.tick(10_000)</code> to fast-forward.
+                Use <code>page.clock().tick(10_000)</code> to fast-forward.
               </p>
             </div>
             <Button

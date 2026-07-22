@@ -11,24 +11,22 @@ import { KeyRound, User, UserCog, UserPlus } from "lucide-react";
 import type { User as UserType } from "@/lib/types";
 
 /**
- * Playwright concept: `cy.session()`.
+ * Playwright concept: `storageState` for session reuse.
  *
- * Playwright 9+ has `cy.session()` which caches login state across tests.
+ * Playwright caches auth state across tests via `storageState`.
  * This module exposes 3 role-based quick-login buttons — perfect for
  * parametrized tests that switch roles.
  *
- *   const roles = ['guest', 'member', 'admin']
- *   roles.forEach((role) => {
- *     describe(`As ${role}`, () => {
- *       beforeEach(() => {
- *         cy.session(role, () => {
- *           cy.visit('/')
- *           cy.get(`[data-testid=session-login-${role}]`).click()
- *         })
- *       })
- *       it('can do X', () => { ... })
- *     })
- *   })
+ *   const roles = ['guest', 'member', 'admin'];
+ *   for (const role of roles) {
+ *     test(`as ${role}`, async ({ page, context }) => {
+ *       // Use saved storageState or log in fresh
+ *       await page.goto('/');
+ *       await page.getByTestId(`session-login-${role}`).click();
+ *       // Save state for reuse
+ *       await context.storageState({ path: `playwright/.auth/${role}.json` });
+ *     });
+ *   }
  */
 
 const ROLES = [
@@ -123,7 +121,7 @@ export function SessionLab() {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Three role-based quick-login buttons — perfect for{" "}
-          <code className="px-1 py-0.5 bg-muted rounded">cy.session()</code>{" "}
+          <code className="px-1 py-0.5 bg-muted rounded">storageState</code>{" "}
           caching across parametrized tests.
         </p>
 
@@ -131,17 +129,20 @@ export function SessionLab() {
           className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono"
           data-testid="session-snippet"
         >
-{`['guest', 'member', 'admin'].forEach((role) => {
-  describe(\`As \${role}\`, () => {
-    beforeEach(() => {
-      cy.session(role, () => {
-        cy.visit('/')
-        cy.get(\`[data-testid=session-login-\${role}]\`).click()
-      })
-    })
-    it('sees the right UI', () => { ... })
-  })
-})`}
+{`// Save auth state per role
+for (const role of ['guest', 'member', 'admin']) {
+  test('as ' + role, async ({ page, context }) => {
+    await page.goto('/');
+    await page.getByTestId('session-login-' + role).click();
+    // Save for reuse in other tests
+    await context.storageState({
+      path: 'playwright/.auth/' + role + '.json',
+    });
+  });
+}
+
+// Reuse saved state in later tests
+test.use({ storageState: 'playwright/.auth/admin.json' });`}
         </pre>
 
         {/* Current session */}

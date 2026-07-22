@@ -7,18 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { GitBranch, Shuffle, Sparkles } from "lucide-react";
 
 /**
- * Playwright concept: conditional testing via `cy.then()` + `cy.request()`.
+ * Playwright concept: conditional testing via `request.get()` + standard `if/else`.
  *
- * Playwright doesn't have native `if/else` for assertions — the recommended
- * pattern is to query backend state first, then branch inside `cy.then()`.
+ * Playwright doesn't need special `if/else` wrappers — just use standard
+ * async/await with `request.get()` to query backend state first.
  *
- *   cy.request('/api/pw/feature-flag?flag=new_dashboard').then((res) => {
- *     if (res.body.data.enabled) {
- *       cy.get('[data-testid=conditional-dashboard-new]').should('be.visible')
- *     } else {
- *       cy.get('[data-testid=conditional-dashboard-old]').should('be.visible')
- *     }
- *   })
+ *   const res = await request.get('/api/pw/feature-flag?flag=new_dashboard');
+ *   const { data } = await res.json();
+ *   if (data.enabled) {
+ *     await expect(page.getByTestId('conditional-dashboard-new')).toBeVisible();
+ *   } else {
+ *     await expect(page.getByTestId('conditional-dashboard-old')).toBeVisible();
+ *   }
  *
  * This module has three sections:
  *   1. Feature flag — deterministic per-flag-name state from the backend
@@ -81,9 +81,8 @@ export function ConditionalLab() {
       </CardHeader>
       <CardContent className="space-y-6">
         <p className="text-sm text-muted-foreground">
-          Three flavors of conditional UI. Playwright can&apos;t <code>if/else</code>{" "}
-          on assertions — use <code className="px-1 py-0.5 bg-muted rounded">cy.request()</code>{" "}
-          + <code className="px-1 py-0.5 bg-muted rounded">cy.then()</code> to
+          Three flavors of conditional UI. Use <code className="px-1 py-0.5 bg-muted rounded">request.get()</code>{" "}
+          + standard <code className="px-1 py-0.5 bg-muted rounded">if/else</code> to
           branch.
         </p>
 
@@ -91,14 +90,15 @@ export function ConditionalLab() {
           className="text-xs bg-muted p-3 rounded-md overflow-x-auto font-mono"
           data-testid="conditional-snippet"
         >
-{`cy.request('/api/pw/feature-flag?flag=new_dashboard')
-  .then((res) => {
-    if (res.body.data.enabled) {
-      cy.get('[data-testid=conditional-dashboard-new]').should('be.visible')
-    } else {
-      cy.get('[data-testid=conditional-dashboard-old]').should('be.visible')
-    }
-  })`}
+{`const res = await request.get('/api/pw/feature-flag?flag=new_dashboard');
+const { data } = await res.json();
+if (data.enabled) {
+  await expect(page.getByTestId('conditional-dashboard-new'))
+    .toBeVisible();
+} else {
+  await expect(page.getByTestId('conditional-dashboard-old'))
+    .toBeVisible();
+}`}
         </pre>
 
         {/* Feature flag */}
@@ -221,7 +221,7 @@ export function ConditionalLab() {
           </p>
           <p className="text-xs text-muted-foreground">
             Truly random — your test can&apos;t predict without opening the box.
-            Use <code>cy.then()</code> + <code>cy.wrap()</code> to handle
+            Use standard <code>if/else</code> + <code>await</code> to handle
             whatever appears.
           </p>
           <Button
