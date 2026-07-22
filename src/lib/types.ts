@@ -56,6 +56,8 @@ export interface BookingItem {
   passengerName: string;
   seat?: string;
   price: number;
+  /** Addon IDs selected during check-in (food, baggage, comfort, digital). */
+  addons?: string[];
 }
 
 export interface User {
@@ -87,6 +89,10 @@ export interface Booking {
   status: "pending" | "confirmed" | "cancelled" | "checked_in";
   pnr: string; // 6-char booking reference
   createdAt: string;
+  /** Set when check-in completes; UTC ISO string. */
+  checkedInAt?: string;
+  /** Addon charges added during check-in. */
+  addonTotal?: number;
 }
 
 export type ViewName =

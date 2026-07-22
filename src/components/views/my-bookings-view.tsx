@@ -12,6 +12,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CheckInDialog } from "./check-in-dialog";
+import { generateInvoicePDF, generateBoardingPassPDF } from "@/lib/pdf";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +47,12 @@ export function MyBookingsView() {
 
   // Cancel state
   const [cancelling, setCancelling] = useState(false);
+
+  // Check-in dialog state (declared up here so hooks order is stable)
+  const [checkInTarget, setCheckInTarget] = useState<{
+    booking: Booking;
+    ticketIndex: number;
+  } | null>(null);
 
   // Refund dialog state
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
@@ -159,50 +167,23 @@ export function MyBookingsView() {
     }
   };
 
-  // === Download invoice (blob download — Playwright waitForEvent('download')) ===
+  // === Download invoice as PDF (Playwright waitForEvent('download')) ===
   const downloadInvoice = (booking: Booking) => {
-    const html = generateInvoiceHTML(booking);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `invoice-${booking.pnr}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast({ title: "Invoice downloaded", description: `invoice-${booking.pnr}.html` });
+    generateInvoicePDF(booking);
+    toast({ title: "Invoice downloaded", description: `invoice-${booking.pnr}.pdf` });
   };
 
-  // === Download boarding pass (blob download) ===
+  // === Download boarding pass as PDF (after check-in) ===
   const downloadBoardingPass = (booking: Booking, ticketIdx: number) => {
     const ticket = booking.items[ticketIdx];
     if (!ticket) return;
-    const html = generateBoardingPassHTML(booking, ticket);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `boarding-pass-${booking.pnr}-${ticketIdx + 1}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast({ title: "Boarding pass downloaded" });
+    generateBoardingPassPDF(booking, ticket);
+    toast({ title: "Boarding pass downloaded", description: `boarding-pass-${booking.pnr}.pdf` });
   };
 
-  // === Online check-in (opens new tab — Playwright waitForEvent('popup')) ===
-  const onlineCheckIn = (booking: Booking, ticketIdx: number) => {
-    const ticket = booking.items[ticketIdx];
-    if (!ticket) return;
-    const html = generateBoardingPassHTML(booking, ticket);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "width=600,height=800");
-    toast({
-      title: "Check-in opened",
-      description: `Boarding pass for ${ticket.passengerName} opened in new tab.`,
-    });
+  // === Online check-in — opens multi-step dialog (seat → addons → confirm → PDF) ===
+  const openCheckIn = (booking: Booking, ticketIdx: number) => {
+    setCheckInTarget({ booking, ticketIndex: ticketIdx });
   };
 
   // === View flight status (opens new tab — Playwright waitForEvent('popup')) ===
@@ -343,13 +324,17 @@ export function MyBookingsView() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => onlineCheckIn(b, i)}
+                                onClick={() => openCheckIn(b, i)}
                                 data-testid={`booking-checkin-${b.id}-${i}`}
                                 className="h-8"
                               >
                                 <Ticket className="h-3.5 w-3.5 mr-1" />
                                 Check in
                               </Button>
+                            </div>
+                          )}
+                          {b.status === "checked_in" && (
+                            <div className="flex gap-1">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -357,7 +342,8 @@ export function MyBookingsView() {
                                 data-testid={`booking-boarding-pass-${b.id}-${i}`}
                                 className="h-8"
                               >
-                                <Download className="h-3.5 w-3.5" />
+                                <Download className="h-3.5 w-3.5 mr-1" />
+                                Boarding pass
                               </Button>
                             </div>
                           )}
@@ -481,145 +467,23 @@ export function MyBookingsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* === Check-in dialog (multi-step: seat → addons → confirm → PDF) === */}
+      {checkInTarget && (
+        <CheckInDialog
+          booking={checkInTarget.booking}
+          ticketIndex={checkInTarget.ticketIndex}
+          open={checkInTarget !== null}
+          onOpenChange={(open) => !open && setCheckInTarget(null)}
+          onCheckInComplete={refreshBookings}
+        />
+      )}
     </div>
   );
 }
 
-// === HTML generators for downloads and popups ===
+// === HTML generator for the flight-status popup (new tab) ===
 
-function generateInvoiceHTML(booking: Booking): string {
-  const ticketsHTML = booking.items.map((item, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td>${item.flightNumber}</td>
-      <td>${item.origin} → ${item.destination}</td>
-      <td>${item.passengerName}</td>
-      <td style="text-transform: capitalize;">${item.cabinClass}</td>
-      <td>${item.seat || "—"}</td>
-      <td style="text-align: right;">$${item.price.toFixed(2)}</td>
-    </tr>
-  `).join("");
-
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Invoice ${booking.pnr} — Fly with Ram</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; color: #18181b; }
-    h1 { color: #0ea5e9; }
-    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 24px; }
-    .pnr { font-size: 24px; font-weight: bold; font-family: monospace; color: #0ea5e9; }
-    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e4e4e7; }
-    th { background: #f4f4f5; font-weight: 600; }
-    .total { font-size: 20px; font-weight: bold; text-align: right; margin-top: 16px; }
-    .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e4e4e7; color: #71717a; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <h1>Fly with Ram</h1>
-      <p>Tax Invoice</p>
-    </div>
-    <div style="text-align: right;">
-      <div class="pnr">${booking.pnr}</div>
-      <p>${new Date(booking.createdAt).toLocaleDateString()}</p>
-    </div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th><th>Flight</th><th>Route</th><th>Passenger</th><th>Cabin</th><th>Seat</th><th style="text-align: right;">Price</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${ticketsHTML}
-    </tbody>
-  </table>
-  <div class="total">Total: $${booking.total.toFixed(2)}</div>
-  <div class="footer">
-    Fly with Ram · Playwright Mastery Academy · This is a mock invoice for testing purposes.
-  </div>
-</body>
-</html>`;
-}
-
-function generateBoardingPassHTML(booking: Booking, ticket: Booking["items"][0]): string {
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Boarding Pass ${booking.pnr} — ${ticket.passengerName}</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
-    .pass { border: 2px solid #0ea5e9; border-radius: 12px; overflow: hidden; }
-    .header { background: #0ea5e9; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
-    .header h1 { margin: 0; font-size: 20px; }
-    .pnr { font-family: monospace; font-size: 18px; font-weight: bold; }
-    .body { padding: 24px; }
-    .route { display: flex; justify-content: space-between; align-items: center; margin: 16px 0; }
-    .airport { text-align: center; }
-    .airport .code { font-size: 32px; font-weight: bold; }
-    .airport .time { font-size: 14px; color: #71717a; }
-    .plane { font-size: 24px; }
-    .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e4e4e7; }
-    .label { color: #71717a; font-size: 12px; text-transform: uppercase; }
-    .value { font-weight: bold; }
-    .barcode { text-align: center; margin-top: 16px; font-family: monospace; font-size: 10px; letter-spacing: 2px; }
-  </style>
-</head>
-<body>
-  <div class="pass">
-    <div class="header">
-      <h1>✈ Fly with Ram</h1>
-      <div class="pnr">${booking.pnr}</div>
-    </div>
-    <div class="body">
-      <div class="row">
-        <span class="label">Passenger</span>
-        <span class="value" data-testid="popup-passenger">${ticket.passengerName}</span>
-      </div>
-      <div class="route">
-        <div class="airport">
-          <div class="code">${ticket.origin}</div>
-          <div class="time">${new Date(ticket.departureTime).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</div>
-        </div>
-        <div class="plane">✈</div>
-        <div class="airport">
-          <div class="code">${ticket.destination}</div>
-          <div class="time">${new Date(ticket.arrivalTime).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"})}</div>
-        </div>
-      </div>
-      <div class="row">
-        <span class="label">Flight</span>
-        <span class="value">${ticket.flightNumber}</span>
-      </div>
-      <div class="row">
-        <span class="label">Seat</span>
-        <span class="value" data-testid="popup-seat">${ticket.seat || "Not assigned"}</span>
-      </div>
-      <div class="row">
-        <span class="label">Cabin</span>
-        <span class="value" style="text-transform: capitalize;">${ticket.cabinClass}</span>
-      </div>
-      <div class="row">
-        <span class="label">Date</span>
-        <span class="value">${new Date(ticket.departureTime).toLocaleDateString()}</span>
-      </div>
-      <div class="barcode">
-        ||| || ||| |||| || ||||| ||| || |||| ||| |||| || |||||
-        <br>${booking.pnr} ${ticket.passengerName.toUpperCase().replace(/\s/g, "")}
-      </div>
-    </div>
-  </div>
-  <p style="text-align: center; color: #71717a; font-size: 12px; margin-top: 16px;">
-    Fly with Ram · Boarding pass for testing purposes
-  </p>
-</body>
-</html>`;
-}
 
 function generateFlightStatusHTML(booking: Booking): string {
   const firstTicket = booking.items[0];
