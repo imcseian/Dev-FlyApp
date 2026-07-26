@@ -54,11 +54,8 @@ export function MyBookingsView() {
     ticketIndex: number;
   } | null>(null);
 
-  // Refund dialog state
+  // Refund details dialog state (view-only — refund is automatic on cancel)
   const [refundTarget, setRefundTarget] = useState<Booking | null>(null);
-  const [refundReason, setRefundReason] = useState("");
-  const [refundFile, setRefundFile] = useState<File | null>(null);
-  const [submittingRefund, setSubmittingRefund] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -93,11 +90,11 @@ export function MyBookingsView() {
   };
 
   // === Cancel booking (uses window.confirm — Playwright page.on('dialog')) ===
-  const handleCancel = async (booking: Booking) => {
+  const handleCancel = async (booking: Booking, reason?: string) => {
     // Use window.confirm — Playwright intercepts via page.on('dialog')
     const ok = window.confirm(
       `Cancel booking ${booking.pnr}? This action cannot be undone. ` +
-      `A refund of $${booking.total.toFixed(2)} will be processed in 5-7 business days.`
+      `A refund of $${(booking.total + (booking.addonTotal ?? 0)).toFixed(2)} will be processed in 5-7 business days.`
     );
     if (!ok) return;
 
@@ -106,7 +103,7 @@ export function MyBookingsView() {
       const res = await fetch("/api/booking/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id }),
+        body: JSON.stringify({ bookingId: booking.id, reason }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -119,7 +116,7 @@ export function MyBookingsView() {
       }
       toast({
         title: "Booking cancelled",
-        description: `PNR ${booking.pnr} — refund of $${booking.total.toFixed(2)} processing.`,
+        description: `PNR ${booking.pnr} — refund of $${data.booking.refund.amount.toFixed(2)} processing. Reference: ${data.booking.refund.reference}`,
       });
       await refreshBookings();
     } finally {
@@ -127,44 +124,9 @@ export function MyBookingsView() {
     }
   };
 
-  // === Refund request (file upload — Playwright setInputFiles) ===
+  // === View refund details (after cancellation) ===
   const handleRefund = (booking: Booking) => {
     setRefundTarget(booking);
-    setRefundReason("");
-    setRefundFile(null);
-  };
-
-  const submitRefund = async () => {
-    if (!refundTarget || !refundReason.trim()) return;
-    setSubmittingRefund(true);
-    try {
-      const form = new FormData();
-      form.append("bookingId", refundTarget.id);
-      form.append("reason", refundReason);
-      if (refundFile) form.append("file", refundFile);
-
-      const res = await fetch("/api/booking/refund", {
-        method: "POST",
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({
-          title: "Refund request failed",
-          description: data.error,
-          variant: "destructive",
-        });
-        return;
-      }
-      toast({
-        title: "Refund submitted!",
-        description: `Refund of $${data.refund.refundAmount.toFixed(2)} — ${data.refund.processingTime}.`,
-      });
-      setRefundTarget(null);
-      await refreshBookings();
-    } finally {
-      setSubmittingRefund(false);
-    }
   };
 
   // === Download invoice as PDF (Playwright waitForEvent('download')) ===
@@ -369,13 +331,22 @@ export function MyBookingsView() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleRefund(b)}
-                            data-testid={`booking-refund-${b.id}`}
-                            className="text-amber-600"
+                            onClick={() => handleCancel(b)}
+                            disabled={cancelling}
+                            data-testid={`booking-cancel-${b.id}`}
+                            className="text-destructive"
                           >
-                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                            Request refund
+                            {cancelling ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            Cancel booking
                           </Button>
+                        </>
+                      )}
+                      {b.status === "checked_in" && (
+                        <>
                           <Button
                             variant="outline"
                             size="sm"
@@ -389,9 +360,21 @@ export function MyBookingsView() {
                             ) : (
                               <XCircle className="h-3.5 w-3.5 mr-1" />
                             )}
-                            Cancel
+                            Cancel &amp; refund
                           </Button>
                         </>
+                      )}
+                      {b.status === "cancelled" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRefund(b)}
+                          data-testid={`booking-refund-${b.id}`}
+                          className="text-amber-600"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                          View refund
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -402,68 +385,105 @@ export function MyBookingsView() {
         </ul>
       )}
 
-      {/* === Refund Dialog (file upload) === */}
+      {/* === Refund Details Dialog (view-only, after cancellation) === */}
       <Dialog
         open={refundTarget !== null}
         onOpenChange={(open) => !open && setRefundTarget(null)}
       >
         <DialogContent data-testid="refund-dialog">
           <DialogHeader>
-            <DialogTitle>Request refund for {refundTarget?.pnr}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-amber-600" />
+              Refund details — {refundTarget?.pnr}
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="refund-reason" className="text-sm">
-                Reason for refund
-              </Label>
-              <Textarea
-                id="refund-reason"
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-                placeholder="e.g., Medical emergency, schedule conflict, flight cancelled..."
-                data-testid="refund-reason-input"
-                rows={3}
-              />
+          {refundTarget?.refund ? (
+            <div className="space-y-3" data-testid="refund-details">
+              <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg">
+                <span className="text-sm font-medium">Status</span>
+                <Badge
+                  variant="outline"
+                  className="bg-amber-500/15 text-amber-700 dark:text-amber-400 capitalize"
+                  data-testid="refund-status"
+                >
+                  {refundTarget.refund.status}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">Reference</div>
+                  <div
+                    className="font-mono font-bold"
+                    data-testid="refund-reference"
+                  >
+                    {refundTarget.refund.reference}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Amount</div>
+                  <div
+                    className="font-bold text-lg"
+                    data-testid="refund-amount"
+                  >
+                    ${refundTarget.refund.amount.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Method</div>
+                  <div data-testid="refund-method">
+                    {refundTarget.refund.method}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Processing time</div>
+                  <div data-testid="refund-processing-time">
+                    {refundTarget.refund.processingTime}
+                  </div>
+                </div>
+                <div className="col-span-2">
+                  <div className="text-xs text-muted-foreground">Requested at</div>
+                  <div data-testid="refund-requested-at">
+                    {new Date(refundTarget.refund.requestedAt).toLocaleString()}
+                  </div>
+                </div>
+                {refundTarget.cancelReason && (
+                  <div className="col-span-2">
+                    <div className="text-xs text-muted-foreground">Reason</div>
+                    <div data-testid="refund-reason">
+                      {refundTarget.cancelReason}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div
+                className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground"
+                data-testid="refund-note"
+              >
+                Your refund has been initiated and will be credited to your
+                original payment method within {refundTarget.refund.processingTime}.
+                Keep the reference number for your records.
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="refund-file" className="text-sm">
-                Supporting document (optional)
-              </Label>
-              <Input
-                id="refund-file"
-                type="file"
-                accept=".pdf,.jpg,.png,.doc,.docx"
-                onChange={(e) => setRefundFile(e.target.files?.[0] ?? null)}
-                data-testid="refund-file-input"
-              />
-              <p className="text-xs text-muted-foreground">
-                Medical certificate, ID, or other proof. Max 5MB.
-              </p>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              No refund information available.
             </div>
-          </div>
+          )}
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" data-testid="refund-cancel">
-                Cancel
+              <Button variant="outline" data-testid="refund-close">
+                Close
               </Button>
             </DialogClose>
-            <Button
-              onClick={submitRefund}
-              disabled={!refundReason.trim() || submittingRefund}
-              data-testid="refund-submit"
-            >
-              {submittingRefund ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Submit refund
-                </>
-              )}
-            </Button>
+            {refundTarget?.refund && (
+              <Button
+                onClick={() => downloadInvoice(refundTarget)}
+                data-testid="refund-download-invoice"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download cancelled invoice
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

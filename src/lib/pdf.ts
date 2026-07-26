@@ -48,6 +48,16 @@ export function generateInvoicePDF(booking: Booking): void {
     { align: "right" }
   );
 
+  // CANCELLED stamp (red box) if cancelled
+  if (booking.status === "cancelled") {
+    doc.setFillColor(220, 38, 38); // red-600
+    doc.roundedRect(pageWidth - margin - 110, 65, 110, 22, 4, 4, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("CANCELLED", pageWidth - margin - 55, 80, { align: "center" });
+  }
+
   y = 110;
   doc.setTextColor(...DARK);
   doc.setFontSize(13);
@@ -184,6 +194,40 @@ export function generateInvoicePDF(booking: Booking): void {
   doc.text(`$${grandTotal.toFixed(2)}`, pageWidth - margin - 8, y, {
     align: "right",
   });
+
+  // === Refund section (if cancelled) ===
+  if (booking.status === "cancelled" && booking.refund) {
+    y += 30;
+    doc.setFillColor(254, 243, 199); // amber-100
+    doc.rect(margin, y - 10, pageWidth - margin * 2, 90, "F");
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(180, 83, 9); // amber-700
+    doc.text("BOOKING CANCELLED — REFUND DETAILS", margin + 10, y + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...DARK);
+    y += 20;
+    const refund = booking.refund;
+    const refundRows: [string, string][] = [
+      ["Refund reference", refund.reference],
+      ["Refund amount", `$${refund.amount.toFixed(2)}`],
+      ["Method", refund.method],
+      ["Processing time", refund.processingTime],
+      ["Status", refund.status.toUpperCase()],
+      ["Requested at", new Date(refund.requestedAt).toLocaleString()],
+    ];
+    if (booking.cancelReason) {
+      refundRows.push(["Reason", booking.cancelReason]);
+    }
+    for (const [label, value] of refundRows) {
+      doc.setTextColor(...MUTED);
+      doc.text(label, margin + 10, y);
+      doc.setTextColor(...DARK);
+      doc.text(value, margin + 160, y);
+      y += 12;
+    }
+  }
 
   // === Footer ===
   const footerY = doc.internal.pageSize.getHeight() - 40;

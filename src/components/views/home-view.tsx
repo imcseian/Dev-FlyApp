@@ -25,7 +25,9 @@ import {
   Star,
   FlaskConical,
   Sparkles,
+  Calendar as CalendarIcon,
 } from "lucide-react";
+import { Calendar as Calendar_component } from "@/components/ui/calendar";
 import { AIRPORTS, CATALOG } from "@/lib/catalog";
 import type { Flight } from "@/lib/types";
 
@@ -45,6 +47,14 @@ export function HomeView() {
   const [destination, setDestination] = useState("LAX");
   const [tripType, setTripType] = useState<"oneway" | "roundtrip">("oneway");
   const [passengers, setPassengers] = useState(1);
+  const [departureDate, setDepartureDate] = useState<Date | undefined>(
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 1 week from today
+  );
+  const [returnDate, setReturnDate] = useState<Date | undefined>(
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 2 weeks from today
+  );
+  const [showDepartCalendar, setShowDepartCalendar] = useState(false);
+  const [showReturnCalendar, setShowReturnCalendar] = useState(false);
   const [featured, setFeatured] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +80,14 @@ export function HomeView() {
     if (typeof window !== "undefined") {
       sessionStorage.setItem(
         "fwr_search",
-        JSON.stringify({ origin, destination, tripType, passengers })
+        JSON.stringify({
+          origin,
+          destination,
+          tripType,
+          passengers,
+          departureDate: departureDate?.toISOString(),
+          returnDate: returnDate?.toISOString(),
+        })
       );
     }
   };
@@ -189,6 +206,103 @@ export function HomeView() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              {/* Date pickers — departure + return (if round-trip) */}
+              <div
+                className={`grid grid-cols-1 ${tripType === "roundtrip" ? "sm:grid-cols-2" : ""} gap-2 items-end`}
+              >
+                <div className="space-y-1 relative">
+                  <Label htmlFor="departure-date" className="text-xs">
+                    Departure date
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    id="departure-date"
+                    onClick={() => {
+                      setShowDepartCalendar((s) => !s);
+                      setShowReturnCalendar(false);
+                    }}
+                    data-testid="search-departure-date"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {departureDate
+                      ? departureDate.toLocaleDateString(undefined, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "Pick a date"}
+                  </Button>
+                  {showDepartCalendar && (
+                    <div
+                      className="absolute z-50 top-full mt-1"
+                      data-testid="departure-calendar"
+                    >
+                      <Calendar_component
+                        mode="single"
+                        selected={departureDate}
+                        onSelect={(d) => {
+                          setDepartureDate(d);
+                          setShowDepartCalendar(false);
+                        }}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </div>
+                  )}
+                </div>
+                {tripType === "roundtrip" && (
+                  <div className="space-y-1 relative">
+                    <Label htmlFor="return-date" className="text-xs">
+                      Return date
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      id="return-date"
+                      onClick={() => {
+                        setShowReturnCalendar((s) => !s);
+                        setShowDepartCalendar(false);
+                      }}
+                      data-testid="search-return-date"
+                      className="w-full justify-start text-left font-normal"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      {returnDate
+                        ? returnDate.toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "Pick a date"}
+                    </Button>
+                    {showReturnCalendar && (
+                      <div
+                        className="absolute z-50 top-full mt-1"
+                        data-testid="return-calendar"
+                      >
+                        <Calendar_component
+                          mode="single"
+                          selected={returnDate}
+                          onSelect={(d) => {
+                            setReturnDate(d);
+                            setShowReturnCalendar(false);
+                          }}
+                          disabled={(date) =>
+                            date < new Date() ||
+                            (departureDate ? date < departureDate : false)
+                          }
+                          initialFocus
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Passengers + Search */}

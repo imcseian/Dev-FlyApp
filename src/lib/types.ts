@@ -93,6 +93,20 @@ export interface Booking {
   checkedInAt?: string;
   /** Addon charges added during check-in. */
   addonTotal?: number;
+  /** Round-trip info — outbound + return flight legs. */
+  tripType?: "oneway" | "roundtrip";
+  /** Set when booking is cancelled. */
+  cancelledAt?: string;
+  cancelReason?: string;
+  /** Refund details — populated when booking is cancelled. */
+  refund?: {
+    reference: string;
+    amount: number;
+    processingTime: string;
+    status: "processing" | "completed" | "denied";
+    requestedAt: string;
+    method: string;
+  };
 }
 
 export type ViewName =

@@ -38,6 +38,10 @@ export function SearchView() {
   const [origin, setOrigin] = useState("JFK");
   const [destination, setDestination] = useState("LAX");
   const [passengers, setPassengers] = useState(1);
+  const [tripType, setTripType] = useState<"oneway" | "roundtrip">("oneway");
+  const [departureDate, setDepartureDate] = useState<Date | undefined>();
+  const [returnDate, setReturnDate] = useState<Date | undefined>();
+  const [leg, setLeg] = useState<"outbound" | "return">("outbound");
   const [sort, setSort] = useState("price-asc");
   const [airlineFilter, setAirlineFilter] = useState<string>("all");
   const [maxStops, setMaxStops] = useState<string>("any");
@@ -58,8 +62,17 @@ export function SearchView() {
         const parsed = JSON.parse(stored);
         // eslint-disable-next-line react-hooks/set-state-in-effect
         if (parsed.origin) setOrigin(parsed.origin);
+         
         if (parsed.destination) setDestination(parsed.destination);
+         
         if (parsed.passengers) setPassengers(parsed.passengers);
+         
+        if (parsed.tripType) setTripType(parsed.tripType);
+         
+        if (parsed.departureDate)
+          setDepartureDate(new Date(parsed.departureDate));
+         
+        if (parsed.returnDate) setReturnDate(new Date(parsed.returnDate));
       } catch {
         // ignore
       }
@@ -77,8 +90,11 @@ export function SearchView() {
     (async () => {
       setLoading(true);
       const params = new URLSearchParams();
-      if (origin) params.set("origin", origin);
-      if (destination) params.set("destination", destination);
+      // For return leg of a round-trip, swap origin/destination.
+      const effectiveOrigin = leg === "return" ? destination : origin;
+      const effectiveDestination = leg === "return" ? origin : destination;
+      if (effectiveOrigin) params.set("origin", effectiveOrigin);
+      if (effectiveDestination) params.set("destination", effectiveDestination);
       if (sort) params.set("sort", sort);
       if (airlineFilter !== "all") params.set("airline", airlineFilter);
       if (maxStops !== "any") params.set("maxStops", maxStops);
@@ -99,6 +115,7 @@ export function SearchView() {
   }, [
     origin,
     destination,
+    leg,
     sort,
     airlineFilter,
     maxStops,
@@ -347,8 +364,49 @@ export function SearchView() {
             : `${flights.length} flight${flights.length === 1 ? "" : "s"} found`}
         </p>
         <Badge variant="outline" data-testid="search-route-badge">
-          {origin} → {destination}
+          {leg === "return" ? `${destination} → ${origin}` : `${origin} → ${destination}`}
+          {departureDate && (
+            <span className="ml-2 text-muted-foreground">
+              · {departureDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          )}
+          {tripType === "roundtrip" && returnDate && leg === "return" && (
+            <span className="ml-2 text-muted-foreground">
+              · Return {returnDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+            </span>
+          )}
         </Badge>
+        {tripType === "roundtrip" && (
+          <div
+            className="flex gap-2"
+            data-testid="roundtrip-leg-switcher"
+            role="tablist"
+            aria-label="Select leg"
+          >
+            <Button
+              type="button"
+              variant={leg === "outbound" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setLeg("outbound")}
+              data-testid="leg-outbound"
+              role="tab"
+              aria-selected={leg === "outbound"}
+            >
+              Outbound
+            </Button>
+            <Button
+              type="button"
+              variant={leg === "return" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setLeg("return")}
+              data-testid="leg-return"
+              role="tab"
+              aria-selected={leg === "return"}
+            >
+              Return
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Results grid */}
