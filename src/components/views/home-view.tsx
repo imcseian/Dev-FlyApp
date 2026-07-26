@@ -28,6 +28,11 @@ import {
   Calendar as CalendarIcon,
 } from "lucide-react";
 import { Calendar as Calendar_component } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { AIRPORTS, CATALOG } from "@/lib/catalog";
 import type { Flight } from "@/lib/types";
 
@@ -53,8 +58,6 @@ export function HomeView() {
   const [returnDate, setReturnDate] = useState<Date | undefined>(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 2 weeks from today
   );
-  const [showDepartCalendar, setShowDepartCalendar] = useState(false);
-  const [showReturnCalendar, setShowReturnCalendar] = useState(false);
   const [featured, setFeatured] = useState<Flight[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -212,34 +215,33 @@ export function HomeView() {
               <div
                 className={`grid grid-cols-1 ${tripType === "roundtrip" ? "sm:grid-cols-2" : ""} gap-2 items-end`}
               >
-                <div className="space-y-1 relative">
+                <div className="space-y-1">
                   <Label htmlFor="departure-date" className="text-xs">
                     Departure date
                   </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    id="departure-date"
-                    onClick={() => {
-                      setShowDepartCalendar((s) => !s);
-                      setShowReturnCalendar(false);
-                    }}
-                    data-testid="search-departure-date"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="h-4 w-4 mr-2" />
-                    {departureDate
-                      ? departureDate.toLocaleDateString(undefined, {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : "Pick a date"}
-                  </Button>
-                  {showDepartCalendar && (
-                    <div
-                      className="absolute z-50 top-full mt-1"
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        id="departure-date"
+                        data-testid="search-departure-date"
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        {departureDate
+                          ? departureDate.toLocaleDateString(undefined, {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto p-0"
+                      align="start"
                       data-testid="departure-calendar"
                     >
                       <Calendar_component
@@ -247,43 +249,41 @@ export function HomeView() {
                         selected={departureDate}
                         onSelect={(d) => {
                           setDepartureDate(d);
-                          setShowDepartCalendar(false);
                         }}
-                        disabled={(date) => date < new Date()}
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                         initialFocus
                       />
-                    </div>
-                  )}
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 {tripType === "roundtrip" && (
-                  <div className="space-y-1 relative">
+                  <div className="space-y-1">
                     <Label htmlFor="return-date" className="text-xs">
                       Return date
                     </Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      id="return-date"
-                      onClick={() => {
-                        setShowReturnCalendar((s) => !s);
-                        setShowDepartCalendar(false);
-                      }}
-                      data-testid="search-return-date"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="h-4 w-4 mr-2" />
-                      {returnDate
-                        ? returnDate.toLocaleDateString(undefined, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
-                        : "Pick a date"}
-                    </Button>
-                    {showReturnCalendar && (
-                      <div
-                        className="absolute z-50 top-full mt-1"
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          id="return-date"
+                          data-testid="search-return-date"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          {returnDate
+                            ? returnDate.toLocaleDateString(undefined, {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0"
+                        align="start"
                         data-testid="return-calendar"
                       >
                         <Calendar_component
@@ -291,16 +291,15 @@ export function HomeView() {
                           selected={returnDate}
                           onSelect={(d) => {
                             setReturnDate(d);
-                            setShowReturnCalendar(false);
                           }}
                           disabled={(date) =>
-                            date < new Date() ||
+                            date < new Date(new Date().setHours(0, 0, 0, 0)) ||
                             (departureDate ? date < departureDate : false)
                           }
                           initialFocus
                         />
-                      </div>
-                    )}
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 )}
               </div>
